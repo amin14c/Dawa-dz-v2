@@ -37,6 +37,7 @@ export function AuthPage() {
   const [step, setStep] = useState<'role' | 'details'>('role');
   const [mode, setMode] = useState<'login' | 'register'>('login');
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -49,20 +50,27 @@ export function AuthPage() {
   const handleRoleSelect = (selectedRole: UserRole) => {
     setRole(selectedRole);
     setStep('details');
+    setError(null);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    setError(null);
+    console.log('Starting auth process...', { mode, email: formData.email });
+    
     try {
       let firebaseUser = auth.currentUser;
+      console.log('Current firebase user:', firebaseUser?.uid);
       
       if (mode === 'register') {
         if (!firebaseUser) {
+          console.log('Creating new user...');
           const result = await createUserWithEmailAndPassword(auth, formData.email, formData.password);
           firebaseUser = result.user;
+          console.log('User created:', firebaseUser.uid);
         } else if (firebaseUser.email !== formData.email) {
-          // If logged in with different email, sign out first
+          console.log('Email mismatch, signing out and creating new user...');
           await signOut(auth);
           const result = await createUserWithEmailAndPassword(auth, formData.email, formData.password);
           firebaseUser = result.user;
@@ -79,47 +87,54 @@ export function AuthPage() {
           ...(role === 'pharmacist' && { pharmacyName: formData.pharmacyName })
         };
 
+        console.log('Attempting to save profile to Firestore...', userProfile);
         try {
           await setDoc(doc(db, 'users', firebaseUser.uid), userProfile);
+          console.log('Profile saved successfully');
           toast.success('تم إنشاء الحساب بنجاح');
-          // App.tsx will detect the new profile and redirect
         } catch (firestoreError: any) {
           console.error('Firestore error during registration:', firestoreError);
           handleFirestoreError(firestoreError, OperationType.WRITE, `users/${firebaseUser.uid}`);
         }
       } else {
+        console.log('Signing in...');
         const result = await signInWithEmailAndPassword(auth, formData.email, formData.password);
         firebaseUser = result.user;
+        console.log('Signed in:', firebaseUser.uid);
         
-        // Check if profile exists
         const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
         if (!userDoc.exists()) {
+          console.log('Profile missing for existing user');
           toast.error('حسابك موجود ولكن ينقصه ملف تعريف. يرجى إكمال التسجيل.');
           setMode('register');
           setStep('details');
         } else {
+          console.log('Profile found');
           toast.success('تم تسجيل الدخول بنجاح');
         }
       }
-    } catch (error: any) {
-      console.error('Auth error:', error);
+    } catch (err: any) {
+      console.error('Auth/Firestore error:', err);
       let errorMessage = 'حدث خطأ أثناء العملية';
       
-      if (error.code === 'auth/email-already-in-use') {
+      if (err.code === 'auth/email-already-in-use') {
         errorMessage = 'البريد الإلكتروني مستخدم بالفعل. حاول تسجيل الدخول.';
-      } else if (error.code === 'auth/invalid-credential') {
+      } else if (err.code === 'auth/invalid-credential') {
         errorMessage = 'البريد الإلكتروني أو كلمة المرور غير صحيحة';
-      } else if (error.code === 'auth/weak-password') {
+      } else if (err.code === 'auth/weak-password') {
         errorMessage = 'كلمة المرور ضعيفة جداً (6 أحرف على الأقل)';
-      } else if (error.message && error.message.includes('permission-denied')) {
-        errorMessage = 'خطأ في أذونات قاعدة البيانات. يرجى المحاولة لاحقاً.';
-      } else if (error.message && error.message.startsWith('{')) {
+      } else if (err.message && err.message.includes('permission-denied')) {
+        errorMessage = 'خطأ في أذونات قاعدة البيانات (Permission Denied).';
+      } else if (err.message && err.message.startsWith('{')) {
         try {
-          const detailedError = JSON.parse(error.message);
-          errorMessage = `خطأ: ${detailedError.error}`;
+          const detailedError = JSON.parse(err.message);
+          errorMessage = `خطأ تقني: ${detailedError.error}`;
         } catch (e) {}
+      } else {
+        errorMessage = err.message || 'حدث خطأ غير معروف';
       }
       
+      setError(errorMessage);
       toast.error(errorMessage);
     } finally {
       setLoading(false);
@@ -206,6 +221,11 @@ export function AuthPage() {
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
+            {error && (
+              <div className="p-4 bg-red-50 border border-red-100 rounded-2xl text-red-600 text-sm font-medium">
+                {error}
+              </div>
+            )}
             <div className="space-y-2">
               <label className="text-sm font-semibold text-gray-700 mr-1">البريد الإلكتروني</label>
               <input

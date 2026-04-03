@@ -6,6 +6,7 @@ export interface UserProfile {
   phone: string;
   role: UserRole;
   location: string;
+  email: string;
   pharmacyName?: string;
   createdAt: number;
 }
