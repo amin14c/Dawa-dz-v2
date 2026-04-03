@@ -1,0 +1,126 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: users
+    // Document ID: {uid}
+    // Fields:
+    //   - uid: string (required)
+    //   - name: string (required, size 2-100)
+    //   - phone: string (required, size 10-15)
+    //   - role: string (required, enum: ['patient', 'pharmacist'])
+    //   - location: string (required, size 2-100)
+    //   - pharmacyName: string (optional, size 2-100)
+    //   - createdAt: number (required)
+    //
+    // Collection: medication_requests
+    // Document ID: {requestId}
+    // Fields:
+    //   - id: string (required)
+    //   - patientUid: string (required)
+    //   - patientName: string (required)
+    //   - medicationName: string (required, size 2-200)
+    //   - medicalInfo: string (required, size 2-1000)
+    //   - dosage: string (required, size 1-100)
+    //   - boxes: number (required, positive)
+    //   - deliveryMethod: string (required, enum: ['pickup', 'delivery'])
+    //   - status: string (required, enum: ['pending', 'found', 'completed'])
+    //   - location: string (required)
+    //   - createdAt: number (required)
+    //
+    // Collection: medication_requests/{requestId}/offers
+    // Document ID: {offerId}
+    // Fields:
+    //   - id: string (required)
+    //   - requestId: string (required)
+    //   - pharmacistUid: string (required)
+    //   - pharmacyName: string (required)
+    //   - phone: string (required)
+    //   - message: string (required, size 2-500)
+    //   - available: bool (required)
+    //   - createdAt: number (required)
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isDocOwner() {
+      return isAuthenticated() && request.auth.uid == resource.data.patientUid;
+    }
+
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+
+    function isValidUser(data) {
+      return data.name is string && data.name.size() >= 2 && data.name.size() <= 100 &&
+             data.phone is string && data.phone.size() >= 10 && data.phone.size() <= 15 &&
+             data.role in ['patient', 'pharmacist'] &&
+             data.location is string && data.location.size() >= 2 && data.location.size() <= 100 &&
+             (!('pharmacyName' in data) || (data.pharmacyName is string && data.pharmacyName.size() <= 100)) &&
+             data.createdAt is number;
+    }
+
+    function isValidRequest(data) {
+      return data.medicationName is string && data.medicationName.size() >= 2 && data.medicationName.size() <= 200 &&
+             data.medicalInfo is string && data.medicalInfo.size() >= 2 && data.medicalInfo.size() <= 1000 &&
+             data.dosage is string && data.dosage.size() >= 1 && data.dosage.size() <= 100 &&
+             data.boxes is number && data.boxes > 0 &&
+             data.deliveryMethod in ['pickup', 'delivery'] &&
+             data.status in ['pending', 'found', 'completed'] &&
+             data.createdAt is number;
+    }
+
+    function isValidOffer(data) {
+      return data.message is string && data.message.size() >= 2 && data.message.size() <= 500 &&
+             data.available is bool &&
+             data.createdAt is number;
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      allow create: if isOwner(userId) && isValidUser(request.resource.data) && hasRequiredFields(['uid', 'name', 'phone', 'role', 'location', 'createdAt']);
+      allow update: if isOwner(userId) && isValidUser(request.resource.data) && request.resource.data.role == resource.data.role;
+    }
+
+    match /medication_requests/{requestId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && request.auth.uid == request.resource.data.patientUid && isValidRequest(request.resource.data);
+      allow update: if isAuthenticated() && (
+        (request.auth.uid == resource.data.patientUid && isValidRequest(request.resource.data)) ||
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'pharmacist' && 
+         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status']))
+      );
+      allow delete: if isAuthenticated() && request.auth.uid == resource.data.patientUid;
+
+      match /offers/{offerId} {
+        allow read: if isAuthenticated();
+        allow create: if isAuthenticated() && 
+                      get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'pharmacist' &&
+                      request.auth.uid == request.resource.data.pharmacistUid &&
+                      isValidOffer(request.resource.data);
+      }
+    }
+  }
+}

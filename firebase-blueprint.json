@@ -1,0 +1,68 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "User Profile",
+      "description": "User profile information for both patients and pharmacists.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "The unique ID of the user." },
+        "name": { "type": "string", "description": "The full name of the user." },
+        "phone": { "type": "string", "description": "The phone number of the user." },
+        "role": { "type": "string", "enum": ["patient", "pharmacist"], "description": "The role of the user." },
+        "location": { "type": "string", "description": "The location/wilaya of the user." },
+        "pharmacyName": { "type": "string", "description": "The name of the pharmacy (only for pharmacists)." },
+        "createdAt": { "type": "number", "description": "The timestamp when the user profile was created." }
+      },
+      "required": ["uid", "name", "phone", "role", "location", "createdAt"]
+    },
+    "MedicationRequest": {
+      "title": "Medication Request",
+      "description": "A request for a missing medication created by a patient.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "The unique ID of the request." },
+        "patientUid": { "type": "string", "description": "The UID of the patient who created the request." },
+        "patientName": { "type": "string", "description": "The name of the patient who created the request." },
+        "medicationName": { "type": "string", "description": "The name of the medication requested." },
+        "medicalInfo": { "type": "string", "description": "Medical information and notes from the patient." },
+        "dosage": { "type": "string", "description": "The dosage of the medication." },
+        "boxes": { "type": "number", "description": "The number of boxes requested." },
+        "deliveryMethod": { "type": "string", "enum": ["pickup", "delivery"], "description": "The preferred delivery method." },
+        "status": { "type": "string", "enum": ["pending", "found", "completed"], "description": "The status of the request." },
+        "location": { "type": "string", "description": "The location where the medication is needed." },
+        "createdAt": { "type": "number", "description": "The timestamp when the request was created." }
+      },
+      "required": ["id", "patientUid", "patientName", "medicationName", "medicalInfo", "dosage", "boxes", "deliveryMethod", "status", "location", "createdAt"]
+    },
+    "PharmacyOffer": {
+      "title": "Pharmacy Offer",
+      "description": "An offer from a pharmacist to provide a requested medication.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "The unique ID of the offer." },
+        "requestId": { "type": "string", "description": "The ID of the medication request." },
+        "pharmacistUid": { "type": "string", "description": "The UID of the pharmacist who made the offer." },
+        "pharmacyName": { "type": "string", "description": "The name of the pharmacy making the offer." },
+        "phone": { "type": "string", "description": "The phone number of the pharmacy." },
+        "message": { "type": "string", "description": "A message from the pharmacist to the patient." },
+        "available": { "type": "boolean", "description": "Whether the medication is available." },
+        "createdAt": { "type": "number", "description": "The timestamp when the offer was created." }
+      },
+      "required": ["id", "requestId", "pharmacistUid", "pharmacyName", "phone", "message", "available", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{uid}": {
+      "schema": "UserProfile",
+      "description": "User profiles stored by UID."
+    },
+    "/medication_requests/{requestId}": {
+      "schema": "MedicationRequest",
+      "description": "Medication requests stored by request ID."
+    },
+    "/medication_requests/{requestId}/offers/{offerId}": {
+      "schema": "PharmacyOffer",
+      "description": "Offers for a specific medication request."
+    }
+  }
+}

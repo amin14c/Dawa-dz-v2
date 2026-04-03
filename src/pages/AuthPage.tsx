@@ -1,0 +1,212 @@
+import React, { useState } from 'react';
+import { motion } from 'motion/react';
+import { User, Phone, MapPin, Building2, Pill, ArrowRight } from 'lucide-react';
+import { UserRole } from '../types';
+import { auth, db } from '../firebase';
+import { signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
+import { doc, setDoc, getDoc } from 'firebase/firestore';
+import toast from 'react-hot-toast';
+
+enum OperationType {
+  CREATE = 'create',
+  UPDATE = 'update',
+  DELETE = 'delete',
+  LIST = 'list',
+  GET = 'get',
+  WRITE = 'write',
+}
+
+function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
+  const errInfo = {
+    error: error instanceof Error ? error.message : String(error),
+    authInfo: {
+      userId: auth.currentUser?.uid,
+      email: auth.currentUser?.email,
+    },
+    operationType,
+    path
+  };
+  console.error('Firestore Error: ', JSON.stringify(errInfo));
+  throw new Error(JSON.stringify(errInfo));
+}
+
+export function AuthPage() {
+  const [role, setRole] = useState<UserRole | null>(null);
+  const [step, setStep] = useState<'role' | 'details'>('role');
+  const [loading, setLoading] = useState(false);
+  const [formData, setFormData] = useState({
+    name: '',
+    phone: '',
+    location: '',
+    pharmacyName: ''
+  });
+
+  const handleRoleSelect = (selectedRole: UserRole) => {
+    setRole(selectedRole);
+    setStep('details');
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      const provider = new GoogleAuthProvider();
+      const result = await signInWithPopup(auth, provider);
+      const firebaseUser = result.user;
+
+      const userProfile = {
+        uid: firebaseUser.uid,
+        name: formData.name,
+        phone: formData.phone,
+        location: formData.location,
+        role,
+        createdAt: Date.now(),
+        ...(role === 'pharmacist' && { pharmacyName: formData.pharmacyName })
+      };
+
+      await setDoc(doc(db, 'users', firebaseUser.uid), userProfile);
+      toast.success('تم إنشاء الحساب بنجاح');
+    } catch (error) {
+      console.error('Registration error:', error);
+      if (error instanceof Error && error.message.includes('auth/popup-closed-by-user')) {
+        toast.error('تم إغلاق نافذة التسجيل');
+      } else {
+        toast.error('حدث خطأ أثناء إنشاء الحساب');
+        handleFirestoreError(error, OperationType.WRITE, `users/${auth.currentUser?.uid}`);
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="max-w-md mx-auto py-12">
+      {step === 'role' ? (
+        <div className="space-y-8">
+          <div className="text-center space-y-2">
+            <h2 className="text-3xl font-bold text-gray-900">مرحباً بك في Dawa DZ</h2>
+            <p className="text-gray-600">يرجى اختيار صفتك للمتابعة</p>
+          </div>
+
+          <div className="grid grid-cols-1 gap-4">
+            <button
+              onClick={() => handleRoleSelect('patient')}
+              className="group p-6 bg-white border-2 border-gray-100 rounded-3xl text-right hover:border-emerald-500 transition-all hover:shadow-xl hover:shadow-emerald-50"
+            >
+              <div className="flex items-center justify-between mb-4">
+                <div className="bg-emerald-50 p-3 rounded-2xl group-hover:bg-emerald-500 transition-colors">
+                  <User className="w-6 h-6 text-emerald-600 group-hover:text-white" />
+                </div>
+                <ArrowRight className="w-5 h-5 text-gray-300 group-hover:text-emerald-500 group-hover:translate-x-1 transition-all" />
+              </div>
+              <h3 className="text-xl font-bold text-gray-900 mb-1">طالب دواء (مريض)</h3>
+              <p className="text-sm text-gray-500">أبحث عن دواء مفقود أو أحتاج لمساعدة طبية</p>
+            </button>
+
+            <button
+              onClick={() => handleRoleSelect('pharmacist')}
+              className="group p-6 bg-white border-2 border-gray-100 rounded-3xl text-right hover:border-emerald-500 transition-all hover:shadow-xl hover:shadow-emerald-50"
+            >
+              <div className="flex items-center justify-between mb-4">
+                <div className="bg-emerald-50 p-3 rounded-2xl group-hover:bg-emerald-500 transition-colors">
+                  <Building2 className="w-6 h-6 text-emerald-600 group-hover:text-white" />
+                </div>
+                <ArrowRight className="w-5 h-5 text-gray-300 group-hover:text-emerald-500 group-hover:translate-x-1 transition-all" />
+              </div>
+              <h3 className="text-xl font-bold text-gray-900 mb-1">صيدلي</h3>
+              <p className="text-sm text-gray-500">أريد مساعدة المرضى وتوفير الأدوية المفقودة</p>
+            </button>
+          </div>
+        </div>
+      ) : (
+        <motion.div
+          initial={{ opacity: 0, x: 20 }}
+          animate={{ opacity: 1, x: 0 }}
+          className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-xl shadow-gray-50 space-y-8"
+        >
+          <div className="flex items-center justify-between">
+            <button 
+              onClick={() => setStep('role')}
+              className="text-gray-400 hover:text-gray-600 transition-colors"
+            >
+              <ArrowRight className="w-6 h-6 rotate-180" />
+            </button>
+            <h2 className="text-2xl font-bold text-gray-900">إكمال البيانات</h2>
+            <div className="w-6" />
+          </div>
+
+          <form onSubmit={handleSubmit} className="space-y-6">
+            <div className="space-y-2">
+              <label className="text-sm font-semibold text-gray-700 mr-1">الاسم الكامل</label>
+              <div className="relative">
+                <User className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                <input
+                  required
+                  type="text"
+                  placeholder="أدخل اسمك الكامل"
+                  className="w-full pr-12 pl-4 py-4 bg-gray-50 border-none rounded-2xl focus:ring-2 focus:ring-emerald-500 transition-all"
+                  value={formData.name}
+                  onChange={e => setFormData({ ...formData, name: e.target.value })}
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-semibold text-gray-700 mr-1">رقم الهاتف</label>
+              <div className="relative">
+                <Phone className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                <input
+                  required
+                  type="tel"
+                  placeholder="05XXXXXXXX"
+                  className="w-full pr-12 pl-4 py-4 bg-gray-50 border-none rounded-2xl focus:ring-2 focus:ring-emerald-500 transition-all"
+                  value={formData.phone}
+                  onChange={e => setFormData({ ...formData, phone: e.target.value })}
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-semibold text-gray-700 mr-1">الولاية / المنطقة</label>
+              <div className="relative">
+                <MapPin className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                <input
+                  required
+                  type="text"
+                  placeholder="مثال: الجزائر العاصمة، القبة"
+                  className="w-full pr-12 pl-4 py-4 bg-gray-50 border-none rounded-2xl focus:ring-2 focus:ring-emerald-500 transition-all"
+                  value={formData.location}
+                  onChange={e => setFormData({ ...formData, location: e.target.value })}
+                />
+              </div>
+            </div>
+
+            {role === 'pharmacist' && (
+              <div className="space-y-2">
+                <label className="text-sm font-semibold text-gray-700 mr-1">اسم الصيدلية</label>
+                <div className="relative">
+                  <Building2 className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                  <input
+                    required
+                    type="text"
+                    placeholder="اسم صيدليتك"
+                    className="w-full pr-12 pl-4 py-4 bg-gray-50 border-none rounded-2xl focus:ring-2 focus:ring-emerald-500 transition-all"
+                    value={formData.pharmacyName}
+                    onChange={e => setFormData({ ...formData, pharmacyName: e.target.value })}
+                  />
+                </div>
+              </div>
+            )}
+
+            <button
+              type="submit"
+              className="w-full bg-emerald-600 text-white py-4 rounded-2xl font-bold text-lg hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-100"
+            >
+              إنشاء الحساب
+            </button>
+          </form>
+        </motion.div>
+      )}
+    </div>
+  );
+}

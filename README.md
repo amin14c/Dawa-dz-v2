@@ -1,11 +1,33 @@
-<div align="center">
+# Dawa DZ - منصة البحث عن الأدوية في الجزائر 🇩🇿
 
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
+منصة تجمع بين المرضى والصيادلة في الجزائر لمساعدة المرضى في العثور على الأدوية المفقودة وتنسيق استلامها.
 
-  <h1>Built with AI Studio</h2>
+## المميزات
+- **نظام تسجيل مزدوج**: حسابات مخصصة للمرضى وأخرى للصيادلة.
+- **طلب دواء مفصل**: إمكانية إدخال اسم الدواء، الجرعة، عدد العلب، والمعلومات الطبية.
+- **تحديد طريقة الاستلام**: اختيار بين الاستلام من الصيدلية أو التوصيل للمنزل.
+- **تزامن فوري**: لوحة تحكم تعمل بالوقت الحقيقي باستخدام Firebase Firestore.
+- **تصميم عصري**: واجهة مستخدم متجاوبة تدعم اللغة العربية بالكامل.
 
-  <p>The fastest path from prompt to production with Gemini.</p>
+## التقنيات المستخدمة
+- **React 19**
+- **TypeScript**
+- **Tailwind CSS**
+- **Firebase (Auth & Firestore)**
+- **Framer Motion** (للتحريك)
+- **Capacitor** (لتحويل التطبيق إلى أندرويد)
 
-  <a href="https://aistudio.google.com/apps">Start building</a>
+## كيفية التشغيل محلياً
+1. قم بتحميل المستودع.
+2. قم بتثبيت المكتبات: `npm install`
+3. قم بتشغيل مشروع التطوير: `npm run dev`
 
-</div>
+## تحويل التطبيق إلى APK (Android)
+التطبيق مهيأ للعمل مع Capacitor. اتبع الخطوات التالية:
+1. `npm run build`
+2. `npx cap add android`
+3. `npx cap sync`
+4. `npx cap open android` (يتطلب Android Studio)
+
+## ترخيص
+هذا المشروع مفتوح المصدر.
