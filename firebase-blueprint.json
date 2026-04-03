@@ -10,10 +10,11 @@
         "phone": { "type": "string", "description": "The phone number of the user." },
         "role": { "type": "string", "enum": ["patient", "pharmacist"], "description": "The role of the user." },
         "location": { "type": "string", "description": "The location/wilaya of the user." },
+        "email": { "type": "string", "description": "The email address of the user." },
         "pharmacyName": { "type": "string", "description": "The name of the pharmacy (only for pharmacists)." },
         "createdAt": { "type": "number", "description": "The timestamp when the user profile was created." }
       },
-      "required": ["uid", "name", "phone", "role", "location", "createdAt"]
+      "required": ["uid", "name", "phone", "role", "location", "email", "createdAt"]
     },
     "MedicationRequest": {
       "title": "Medication Request",

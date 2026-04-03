@@ -5,7 +5,7 @@ import { UserRole } from '../types';
 import { cn } from '../lib/utils';
 import { auth, db } from '../firebase';
 import { WILAYAS } from '../data/algeria-locations';
-import { createUserWithEmailAndPassword, signInWithEmailAndPassword } from 'firebase/auth';
+import { createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut } from 'firebase/auth';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
 import toast from 'react-hot-toast';
 
@@ -55,11 +55,18 @@ export function AuthPage() {
     e.preventDefault();
     setLoading(true);
     try {
-      let firebaseUser;
+      let firebaseUser = auth.currentUser;
       
       if (mode === 'register') {
-        const result = await createUserWithEmailAndPassword(auth, formData.email, formData.password);
-        firebaseUser = result.user;
+        if (!firebaseUser) {
+          const result = await createUserWithEmailAndPassword(auth, formData.email, formData.password);
+          firebaseUser = result.user;
+        } else if (firebaseUser.email !== formData.email) {
+          // If logged in with different email, sign out first
+          await signOut(auth);
+          const result = await createUserWithEmailAndPassword(auth, formData.email, formData.password);
+          firebaseUser = result.user;
+        }
 
         const userProfile = {
           uid: firebaseUser.uid,
@@ -72,30 +79,48 @@ export function AuthPage() {
           ...(role === 'pharmacist' && { pharmacyName: formData.pharmacyName })
         };
 
-        await setDoc(doc(db, 'users', firebaseUser.uid), userProfile);
-        toast.success('تم إنشاء الحساب بنجاح');
+        try {
+          await setDoc(doc(db, 'users', firebaseUser.uid), userProfile);
+          toast.success('تم إنشاء الحساب بنجاح');
+          // App.tsx will detect the new profile and redirect
+        } catch (firestoreError: any) {
+          console.error('Firestore error during registration:', firestoreError);
+          handleFirestoreError(firestoreError, OperationType.WRITE, `users/${firebaseUser.uid}`);
+        }
       } else {
         const result = await signInWithEmailAndPassword(auth, formData.email, formData.password);
         firebaseUser = result.user;
-        toast.success('تم تسجيل الدخول بنجاح');
+        
+        // Check if profile exists
+        const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
+        if (!userDoc.exists()) {
+          toast.error('حسابك موجود ولكن ينقصه ملف تعريف. يرجى إكمال التسجيل.');
+          setMode('register');
+          setStep('details');
+        } else {
+          toast.success('تم تسجيل الدخول بنجاح');
+        }
       }
     } catch (error: any) {
       console.error('Auth error:', error);
+      let errorMessage = 'حدث خطأ أثناء العملية';
+      
       if (error.code === 'auth/email-already-in-use') {
-        toast.error('البريد الإلكتروني مستخدم بالفعل');
+        errorMessage = 'البريد الإلكتروني مستخدم بالفعل. حاول تسجيل الدخول.';
       } else if (error.code === 'auth/invalid-credential') {
-        toast.error('البريد الإلكتروني أو كلمة المرور غير صحيحة');
+        errorMessage = 'البريد الإلكتروني أو كلمة المرور غير صحيحة';
       } else if (error.code === 'auth/weak-password') {
-        toast.error('كلمة المرور ضعيفة جداً');
-      } else {
-        toast.error('حدث خطأ أثناء العملية');
-        if (error.code?.startsWith('auth/')) {
-          // Auth error, already handled or generic
-        } else {
-          // Likely Firestore error
-          handleFirestoreError(error, OperationType.WRITE, `users/${auth.currentUser?.uid}`);
-        }
+        errorMessage = 'كلمة المرور ضعيفة جداً (6 أحرف على الأقل)';
+      } else if (error.message && error.message.includes('permission-denied')) {
+        errorMessage = 'خطأ في أذونات قاعدة البيانات. يرجى المحاولة لاحقاً.';
+      } else if (error.message && error.message.startsWith('{')) {
+        try {
+          const detailedError = JSON.parse(error.message);
+          errorMessage = `خطأ: ${detailedError.error}`;
+        } catch (e) {}
       }
+      
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }
