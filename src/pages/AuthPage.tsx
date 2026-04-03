@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
 import { motion } from 'motion/react';
-import { User, Phone, MapPin, Building2, Pill, ArrowRight } from 'lucide-react';
+import { User, Phone, MapPin, Building2, Pill, ArrowRight, ChevronDown } from 'lucide-react';
 import { UserRole } from '../types';
+import { cn } from '../lib/utils';
 import { auth, db } from '../firebase';
-import { signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
+import { WILAYAS } from '../data/algeria-locations';
+import { createUserWithEmailAndPassword, signInWithEmailAndPassword } from 'firebase/auth';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
 import toast from 'react-hot-toast';
 
@@ -33,8 +35,11 @@ function handleFirestoreError(error: unknown, operationType: OperationType, path
 export function AuthPage() {
   const [role, setRole] = useState<UserRole | null>(null);
   const [step, setStep] = useState<'role' | 'details'>('role');
+  const [mode, setMode] = useState<'login' | 'register'>('login');
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
+    email: '',
+    password: '',
     name: '',
     phone: '',
     location: '',
@@ -50,29 +55,40 @@ export function AuthPage() {
     e.preventDefault();
     setLoading(true);
     try {
-      const provider = new GoogleAuthProvider();
-      const result = await signInWithPopup(auth, provider);
-      const firebaseUser = result.user;
+      let firebaseUser;
+      
+      if (mode === 'register') {
+        const result = await createUserWithEmailAndPassword(auth, formData.email, formData.password);
+        firebaseUser = result.user;
 
-      const userProfile = {
-        uid: firebaseUser.uid,
-        name: formData.name,
-        phone: formData.phone,
-        location: formData.location,
-        role,
-        createdAt: Date.now(),
-        ...(role === 'pharmacist' && { pharmacyName: formData.pharmacyName })
-      };
+        const userProfile = {
+          uid: firebaseUser.uid,
+          name: formData.name,
+          phone: formData.phone,
+          location: formData.location,
+          role,
+          email: formData.email,
+          createdAt: Date.now(),
+          ...(role === 'pharmacist' && { pharmacyName: formData.pharmacyName })
+        };
 
-      await setDoc(doc(db, 'users', firebaseUser.uid), userProfile);
-      toast.success('تم إنشاء الحساب بنجاح');
-    } catch (error) {
-      console.error('Registration error:', error);
-      if (error instanceof Error && error.message.includes('auth/popup-closed-by-user')) {
-        toast.error('تم إغلاق نافذة التسجيل');
+        await setDoc(doc(db, 'users', firebaseUser.uid), userProfile);
+        toast.success('تم إنشاء الحساب بنجاح');
       } else {
-        toast.error('حدث خطأ أثناء إنشاء الحساب');
-        handleFirestoreError(error, OperationType.WRITE, `users/${auth.currentUser?.uid}`);
+        const result = await signInWithEmailAndPassword(auth, formData.email, formData.password);
+        firebaseUser = result.user;
+        toast.success('تم تسجيل الدخول بنجاح');
+      }
+    } catch (error: any) {
+      console.error('Auth error:', error);
+      if (error.code === 'auth/email-already-in-use') {
+        toast.error('البريد الإلكتروني مستخدم بالفعل');
+      } else if (error.code === 'auth/invalid-credential') {
+        toast.error('البريد الإلكتروني أو كلمة المرور غير صحيحة');
+      } else if (error.code === 'auth/weak-password') {
+        toast.error('كلمة المرور ضعيفة جداً');
+      } else {
+        toast.error('حدث خطأ أثناء العملية');
       }
     } finally {
       setLoading(false);
@@ -131,78 +147,136 @@ export function AuthPage() {
             >
               <ArrowRight className="w-6 h-6 rotate-180" />
             </button>
-            <h2 className="text-2xl font-bold text-gray-900">إكمال البيانات</h2>
+            <h2 className="text-2xl font-bold text-gray-900">
+              {mode === 'register' ? 'إنشاء حساب جديد' : 'تسجيل الدخول'}
+            </h2>
             <div className="w-6" />
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-6">
+          <div className="flex bg-gray-100 p-1 rounded-2xl">
+            <button
+              onClick={() => setMode('login')}
+              className={cn(
+                "flex-1 py-2 rounded-xl text-sm font-bold transition-all",
+                mode === 'login' ? "bg-white text-emerald-600 shadow-sm" : "text-gray-500"
+              )}
+            >
+              دخول
+            </button>
+            <button
+              onClick={() => setMode('register')}
+              className={cn(
+                "flex-1 py-2 rounded-xl text-sm font-bold transition-all",
+                mode === 'register' ? "bg-white text-emerald-600 shadow-sm" : "text-gray-500"
+              )}
+            >
+              تسجيل
+            </button>
+          </div>
+
+          <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
-              <label className="text-sm font-semibold text-gray-700 mr-1">الاسم الكامل</label>
-              <div className="relative">
-                <User className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                <input
-                  required
-                  type="text"
-                  placeholder="أدخل اسمك الكامل"
-                  className="w-full pr-12 pl-4 py-4 bg-gray-50 border-none rounded-2xl focus:ring-2 focus:ring-emerald-500 transition-all"
-                  value={formData.name}
-                  onChange={e => setFormData({ ...formData, name: e.target.value })}
-                />
-              </div>
+              <label className="text-sm font-semibold text-gray-700 mr-1">البريد الإلكتروني</label>
+              <input
+                required
+                type="email"
+                placeholder="example@mail.com"
+                className="w-full px-4 py-4 bg-gray-50 border-none rounded-2xl focus:ring-2 focus:ring-emerald-500 transition-all"
+                value={formData.email}
+                onChange={e => setFormData({ ...formData, email: e.target.value })}
+              />
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm font-semibold text-gray-700 mr-1">رقم الهاتف</label>
-              <div className="relative">
-                <Phone className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                <input
-                  required
-                  type="tel"
-                  placeholder="05XXXXXXXX"
-                  className="w-full pr-12 pl-4 py-4 bg-gray-50 border-none rounded-2xl focus:ring-2 focus:ring-emerald-500 transition-all"
-                  value={formData.phone}
-                  onChange={e => setFormData({ ...formData, phone: e.target.value })}
-                />
-              </div>
+              <label className="text-sm font-semibold text-gray-700 mr-1">كلمة المرور</label>
+              <input
+                required
+                type="password"
+                placeholder="••••••••"
+                className="w-full px-4 py-4 bg-gray-50 border-none rounded-2xl focus:ring-2 focus:ring-emerald-500 transition-all"
+                value={formData.password}
+                onChange={e => setFormData({ ...formData, password: e.target.value })}
+              />
             </div>
 
-            <div className="space-y-2">
-              <label className="text-sm font-semibold text-gray-700 mr-1">الولاية / المنطقة</label>
-              <div className="relative">
-                <MapPin className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                <input
-                  required
-                  type="text"
-                  placeholder="مثال: الجزائر العاصمة، القبة"
-                  className="w-full pr-12 pl-4 py-4 bg-gray-50 border-none rounded-2xl focus:ring-2 focus:ring-emerald-500 transition-all"
-                  value={formData.location}
-                  onChange={e => setFormData({ ...formData, location: e.target.value })}
-                />
-              </div>
-            </div>
-
-            {role === 'pharmacist' && (
-              <div className="space-y-2">
-                <label className="text-sm font-semibold text-gray-700 mr-1">اسم الصيدلية</label>
-                <div className="relative">
-                  <Building2 className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                  <input
-                    required
-                    type="text"
-                    placeholder="اسم صيدليتك"
-                    className="w-full pr-12 pl-4 py-4 bg-gray-50 border-none rounded-2xl focus:ring-2 focus:ring-emerald-500 transition-all"
-                    value={formData.pharmacyName}
-                    onChange={e => setFormData({ ...formData, pharmacyName: e.target.value })}
-                  />
+            {mode === 'register' && (
+              <>
+                <div className="space-y-2">
+                  <label className="text-sm font-semibold text-gray-700 mr-1">الاسم الكامل</label>
+                  <div className="relative">
+                    <User className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                    <input
+                      required
+                      type="text"
+                      placeholder="أدخل اسمك الكامل"
+                      className="w-full pr-12 pl-4 py-4 bg-gray-50 border-none rounded-2xl focus:ring-2 focus:ring-emerald-500 transition-all"
+                      value={formData.name}
+                      onChange={e => setFormData({ ...formData, name: e.target.value })}
+                    />
+                  </div>
                 </div>
-              </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-semibold text-gray-700 mr-1">رقم الهاتف</label>
+                  <div className="relative">
+                    <Phone className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                    <input
+                      required
+                      type="tel"
+                      placeholder="05XXXXXXXX"
+                      className="w-full pr-12 pl-4 py-4 bg-gray-50 border-none rounded-2xl focus:ring-2 focus:ring-emerald-500 transition-all"
+                      value={formData.phone}
+                      onChange={e => setFormData({ ...formData, phone: e.target.value })}
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-semibold text-gray-700 mr-1">الولاية</label>
+                  <div className="relative">
+                    <MapPin className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                    <select
+                      required
+                      className="w-full pr-12 pl-10 py-4 bg-gray-50 border-none rounded-2xl focus:ring-2 focus:ring-emerald-500 transition-all appearance-none"
+                      value={formData.location}
+                      onChange={e => setFormData({ ...formData, location: e.target.value })}
+                    >
+                      <option value="">اختر الولاية</option>
+                      {WILAYAS.map(wilaya => (
+                        <option key={wilaya.id} value={wilaya.name}>
+                          {wilaya.id} - {wilaya.name}
+                        </option>
+                      ))}
+                    </select>
+                    <ChevronDown className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
+                  </div>
+                </div>
+
+                {role === 'pharmacist' && (
+                  <div className="space-y-2">
+                    <label className="text-sm font-semibold text-gray-700 mr-1">اسم الصيدلية</label>
+                    <div className="relative">
+                      <Building2 className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                      <input
+                        required
+                        type="text"
+                        placeholder="اسم صيدليتك"
+                        className="w-full pr-12 pl-4 py-4 bg-gray-50 border-none rounded-2xl focus:ring-2 focus:ring-emerald-500 transition-all"
+                        value={formData.pharmacyName}
+                        onChange={e => setFormData({ ...formData, pharmacyName: e.target.value })}
+                      />
+                    </div>
+                  </div>
+                )}
+              </>
             )}
 
             <button
               type="submit"
-              className="w-full bg-emerald-600 text-white py-4 rounded-2xl font-bold text-lg hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-100"
+              disabled={loading}
+              className="w-full bg-emerald-600 text-white py-4 rounded-2xl font-bold text-lg hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-100 disabled:opacity-50"
             >
-              إنشاء الحساب
+              {loading ? 'جاري المعالجة...' : (mode === 'register' ? 'إنشاء الحساب' : 'دخول')}
             </button>
           </form>
         </motion.div>

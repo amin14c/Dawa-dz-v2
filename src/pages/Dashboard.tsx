@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Plus, Pill, ClipboardList, Send, MapPin, Package, Clock, CheckCircle2, MessageSquare } from 'lucide-react';
+import { Plus, Pill, ClipboardList, Send, MapPin, Package, Clock, CheckCircle2, MessageSquare, ChevronDown } from 'lucide-react';
 import { MedicationRequest, PharmacyOffer } from '../types';
 import { cn } from '../lib/utils';
 import { db, auth } from '../firebase';
+import { COMMON_MEDICINES } from '../data/medicines';
 import { collection, addDoc, onSnapshot, query, orderBy, where, serverTimestamp, doc, setDoc } from 'firebase/firestore';
 import toast from 'react-hot-toast';
 
@@ -43,7 +44,8 @@ export function Dashboard({ user }: DashboardProps) {
     medicalInfo: '',
     dosage: '',
     boxes: 1,
-    deliveryMethod: 'pickup' as 'pickup' | 'delivery'
+    deliveryMethod: 'pickup' as 'pickup' | 'delivery',
+    urgency: 'normal' as 'normal' | 'urgent' | 'critical'
   });
 
   useEffect(() => {
@@ -97,7 +99,8 @@ export function Dashboard({ user }: DashboardProps) {
         medicalInfo: '',
         dosage: '',
         boxes: 1,
-        deliveryMethod: 'pickup'
+        deliveryMethod: 'pickup',
+        urgency: 'normal'
       });
       toast.success('تم نشر طلبك بنجاح!');
     } catch (error) {
@@ -161,7 +164,15 @@ export function Dashboard({ user }: DashboardProps) {
                         <Pill className="w-6 h-6 text-emerald-600" />
                       </div>
                       <div>
-                        <h3 className="text-xl font-bold text-gray-900">{req.medicationName}</h3>
+                        <div className="flex items-center gap-2 mb-1">
+                          <h3 className="text-xl font-bold text-gray-900">{req.medicationName}</h3>
+                          {req.urgency === 'critical' && (
+                            <span className="animate-pulse bg-red-500 text-white text-[10px] px-2 py-0.5 rounded-full font-bold">حالة حرجة</span>
+                          )}
+                          {req.urgency === 'urgent' && (
+                            <span className="bg-orange-500 text-white text-[10px] px-2 py-0.5 rounded-full font-bold">مستعجل</span>
+                          )}
+                        </div>
                         <p className="text-sm text-gray-500">بواسطة: {req.patientName}</p>
                       </div>
                     </div>
@@ -248,17 +259,48 @@ export function Dashboard({ user }: DashboardProps) {
 
               <form onSubmit={handleCreateRequest} className="space-y-6">
                 <div className="space-y-2">
+                  <label className="text-sm font-semibold text-gray-700 mr-1">مستوى الاستعجال</label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {[
+                      { id: 'normal', label: 'عادي', color: 'bg-blue-50 border-blue-200 text-blue-700' },
+                      { id: 'urgent', label: 'مستعجل', color: 'bg-orange-50 border-orange-200 text-orange-700' },
+                      { id: 'critical', label: 'حالة حرجة', color: 'bg-red-50 border-red-200 text-red-700' }
+                    ].map((level) => (
+                      <button
+                        key={level.id}
+                        type="button"
+                        onClick={() => setNewRequest({ ...newRequest, urgency: level.id as any })}
+                        className={cn(
+                          "py-3 rounded-xl font-bold text-xs transition-all border-2",
+                          newRequest.urgency === level.id 
+                            ? level.color 
+                            : "bg-gray-50 border-transparent text-gray-500"
+                        )}
+                      >
+                        {level.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="space-y-2">
                   <label className="text-sm font-semibold text-gray-700 mr-1">اسم الدواء</label>
                   <div className="relative">
                     <Pill className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                     <input
                       required
                       type="text"
+                      list="medicines-list"
                       placeholder="مثال: Ventoline, Panadol..."
                       className="w-full pr-12 pl-4 py-4 bg-gray-50 border-none rounded-2xl focus:ring-2 focus:ring-emerald-500 transition-all"
                       value={newRequest.medicationName}
                       onChange={e => setNewRequest({ ...newRequest, medicationName: e.target.value })}
                     />
+                    <datalist id="medicines-list">
+                      {COMMON_MEDICINES.map((med, index) => (
+                        <option key={index} value={med} />
+                      ))}
+                    </datalist>
                   </div>
                 </div>
 
@@ -365,7 +407,15 @@ export function Dashboard({ user }: DashboardProps) {
                       <Pill className="w-6 h-6 text-emerald-600" />
                     </div>
                     <div>
-                      <h3 className="text-xl font-bold text-gray-900">{req.medicationName}</h3>
+                      <div className="flex items-center gap-2 mb-1">
+                        <h3 className="text-xl font-bold text-gray-900">{req.medicationName}</h3>
+                        {req.urgency === 'critical' && (
+                          <span className="animate-pulse bg-red-500 text-white text-[10px] px-2 py-0.5 rounded-full font-bold">حالة حرجة</span>
+                        )}
+                        {req.urgency === 'urgent' && (
+                          <span className="bg-orange-500 text-white text-[10px] px-2 py-0.5 rounded-full font-bold">مستعجل</span>
+                        )}
+                      </div>
                       <div className="flex items-center gap-2 text-sm">
                         <span className="px-2 py-0.5 bg-yellow-50 text-yellow-700 rounded-md font-medium">قيد البحث</span>
                         <span className="text-gray-400">•</span>
