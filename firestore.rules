@@ -74,6 +74,7 @@ service cloud.firestore {
              data.phone is string && data.phone.size() >= 10 && data.phone.size() <= 15 &&
              data.role in ['patient', 'pharmacist'] &&
              data.location is string && data.location.size() >= 2 && data.location.size() <= 100 &&
+             data.email is string &&
              (!('pharmacyName' in data) || (data.pharmacyName is string && data.pharmacyName.size() <= 100)) &&
              data.createdAt is number;
     }
@@ -100,7 +101,7 @@ service cloud.firestore {
 
     match /users/{userId} {
       allow read: if isAuthenticated();
-      allow create: if isOwner(userId) && isValidUser(request.resource.data) && hasRequiredFields(['uid', 'name', 'phone', 'role', 'location', 'createdAt']);
+      allow create: if isOwner(userId) && isValidUser(request.resource.data) && hasRequiredFields(['uid', 'name', 'phone', 'role', 'location', 'email', 'createdAt']);
       allow update: if isOwner(userId) && isValidUser(request.resource.data) && request.resource.data.role == resource.data.role;
     }
 

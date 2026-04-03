@@ -89,6 +89,12 @@ export function AuthPage() {
         toast.error('كلمة المرور ضعيفة جداً');
       } else {
         toast.error('حدث خطأ أثناء العملية');
+        if (error.code?.startsWith('auth/')) {
+          // Auth error, already handled or generic
+        } else {
+          // Likely Firestore error
+          handleFirestoreError(error, OperationType.WRITE, `users/${auth.currentUser?.uid}`);
+        }
       }
     } finally {
       setLoading(false);
