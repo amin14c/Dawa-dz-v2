@@ -20,7 +20,10 @@ jobs:
           cache: 'npm'
 
       - name: Install Dependencies
-        run: npm install
+        run: |
+          npm config set fetch-retry-maxtimeout 600000
+          npm config set fetch-retries 5
+          npm ci || npm install
 
       - name: Build Web App
         run: npm run build
