@@ -178,6 +178,20 @@ export function AuthPage() {
               <h3 className="text-xl font-bold text-gray-900 mb-1">صيدلي</h3>
               <p className="text-sm text-gray-500">أريد مساعدة المرضى وتوفير الأدوية المفقودة</p>
             </button>
+
+            <button
+              onClick={() => handleRoleSelect('donor')}
+              className="group p-6 bg-white border-2 border-gray-100 rounded-3xl text-right hover:border-emerald-500 transition-all hover:shadow-xl hover:shadow-emerald-50"
+            >
+              <div className="flex items-center justify-between mb-4">
+                <div className="bg-emerald-50 p-3 rounded-2xl group-hover:bg-emerald-500 transition-colors">
+                  <Pill className="w-6 h-6 text-emerald-600 group-hover:text-white" />
+                </div>
+                <ArrowRight className="w-5 h-5 text-gray-300 group-hover:text-emerald-500 group-hover:translate-x-1 transition-all" />
+              </div>
+              <h3 className="text-xl font-bold text-gray-900 mb-1">متبرع</h3>
+              <p className="text-sm text-gray-500">لدي أدوية أريد التبرع بها للمحتاجين</p>
+            </button>
           </div>
         </div>
       ) : (

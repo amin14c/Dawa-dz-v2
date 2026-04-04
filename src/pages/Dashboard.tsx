@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Plus, Pill, ClipboardList, Send, MapPin, Package, Clock, CheckCircle2, MessageSquare, ChevronDown, Search, Image as ImageIcon } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Plus, Pill, ClipboardList, Send, MapPin, Package, Clock, CheckCircle2, MessageSquare, ChevronDown, Search, Image as ImageIcon, HeartHandshake } from 'lucide-react';
 import { MedicationRequest, PharmacyOffer } from '../types';
 import { cn } from '../lib/utils';
 import { db, auth, storage } from '../firebase';
@@ -39,6 +40,7 @@ interface DashboardProps {
 export function Dashboard({ user }: DashboardProps) {
   const [showNewRequest, setShowNewRequest] = useState(false);
   const [requests, setRequests] = useState<MedicationRequest[]>([]);
+  const [donorDonations, setDonorDonations] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [filterLocation, setFilterLocation] = useState(user.role === 'pharmacist' ? user.location : '');
   const [searchQuery, setSearchQuery] = useState('');
@@ -57,7 +59,26 @@ export function Dashboard({ user }: DashboardProps) {
 
   useEffect(() => {
     let q;
-    if (user.role === 'pharmacist') {
+    let unsubscribeDonations: () => void;
+
+    if (user.role === 'donor') {
+      const dq = query(
+        collection(db, 'medication_donations'),
+        where('donorUid', '==', user.uid),
+        orderBy('createdAt', 'desc')
+      );
+      unsubscribeDonations = onSnapshot(dq, (snapshot) => {
+        const fetchedDonations = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+        setDonorDonations(fetchedDonations);
+        setLoading(false);
+      }, (error) => {
+        handleFirestoreError(error, OperationType.LIST, 'medication_donations');
+      });
+      return () => unsubscribeDonations && unsubscribeDonations();
+    } else if (user.role === 'pharmacist') {
       if (pharmacistTab === 'pending') {
         if (filterLocation) {
           q = query(
@@ -199,6 +220,80 @@ export function Dashboard({ user }: DashboardProps) {
     return (
       <div className="flex items-center justify-center py-20">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-emerald-600"></div>
+      </div>
+    );
+  }
+
+  if (user.role === 'donor') {
+    return (
+      <div className="space-y-8">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">لوحة تحكم المتبرع</h1>
+            <p className="text-gray-500 dark:text-gray-400">إدارة تبرعاتك بالأدوية</p>
+          </div>
+          <Link
+            to="/donations"
+            className="bg-emerald-600 text-white px-6 py-3 rounded-xl font-medium hover:bg-emerald-700 transition-colors flex items-center gap-2 shadow-lg shadow-emerald-200 dark:shadow-none"
+          >
+            <Plus className="w-5 h-5" />
+            إضافة تبرع جديد
+          </Link>
+        </div>
+
+        <div className="grid grid-cols-1 gap-6">
+          {donorDonations.length === 0 ? (
+            <div className="text-center py-20 bg-white dark:bg-gray-900 rounded-[3rem] border border-dashed border-gray-200 dark:border-gray-800">
+              <div className="bg-gray-50 dark:bg-gray-800 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6">
+                <HeartHandshake className="w-10 h-10 text-gray-300 dark:text-gray-600" />
+              </div>
+              <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">لا توجد تبرعات حالياً</h3>
+              <p className="text-gray-500 dark:text-gray-400">ابدأ بإضافة أول تبرع لك لمساعدة المحتاجين</p>
+            </div>
+          ) : (
+            donorDonations.map((donation) => (
+              <motion.div
+                key={donation.id}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="bg-white dark:bg-gray-900 p-6 rounded-[2rem] border border-gray-100 dark:border-gray-800 shadow-sm"
+              >
+                <div className="flex flex-col md:flex-row justify-between gap-6">
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-3">
+                      <div className="bg-emerald-50 dark:bg-emerald-900/30 p-2 rounded-xl">
+                        <Pill className="w-6 h-6 text-emerald-600 dark:text-emerald-400" />
+                      </div>
+                      <div>
+                        <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-1">{donation.medicationName}</h3>
+                        <div className="flex items-center gap-2 text-sm">
+                          {donation.status === 'claimed' ? (
+                            <span className="px-2 py-0.5 bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 rounded-md font-medium">تم الحجز</span>
+                          ) : (
+                            <span className="px-2 py-0.5 bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 rounded-md font-medium">متاح للتبرع</span>
+                          )}
+                          <span className="text-gray-400">•</span>
+                          <span className="text-gray-500 dark:text-gray-400">{new Date(donation.createdAt).toLocaleDateString('ar-DZ')}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
+                        <Package className="w-4 h-4 text-emerald-500" />
+                        <span>الكمية: {donation.quantity}</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
+                        <Clock className="w-4 h-4 text-emerald-500" />
+                        <span dir="ltr">انتهاء: {donation.expiryDate}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+            ))
+          )}
+        </div>
       </div>
     );
   }

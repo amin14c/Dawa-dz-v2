@@ -11,7 +11,7 @@ service cloud.firestore {
     //   - uid: string (required)
     //   - name: string (required, size 2-100)
     //   - phone: string (required, size 10-15)
-    //   - role: string (required, enum: ['patient', 'pharmacist', 'admin'])
+    //   - role: string (required, enum: ['patient', 'pharmacist', 'admin', 'donor'])
     //   - location: string (required, size 2-100)
     //   - pharmacyName: string (optional, size 2-100)
     //   - createdAt: number (required)
@@ -94,7 +94,7 @@ service cloud.firestore {
       return data.uid is string && data.uid.size() > 0 &&
              data.name is string && data.name.size() >= 2 && data.name.size() <= 100 &&
              data.phone is string && data.phone.size() >= 10 && data.phone.size() <= 15 &&
-             data.role in ['patient', 'pharmacist', 'admin'] &&
+             data.role in ['patient', 'pharmacist', 'admin', 'donor'] &&
              data.location is string && data.location.size() >= 2 && data.location.size() <= 100 &&
              data.email is string && data.email.size() >= 5 &&
              (!('pharmacyName' in data) || (data.pharmacyName is string && data.pharmacyName.size() <= 100)) &&
