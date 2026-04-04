@@ -7,6 +7,8 @@ import { Layout } from './components/Layout';
 import { Home } from './pages/Home';
 import { AuthPage } from './pages/AuthPage';
 import { Dashboard } from './pages/Dashboard';
+import { AdminDashboard } from './pages/AdminDashboard';
+import { DonationsPage } from './pages/DonationsPage';
 import toast from 'react-hot-toast';
 
 export default function App() {
@@ -48,7 +50,7 @@ export default function App() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-emerald-50">
+      <div className="min-h-screen flex items-center justify-center bg-emerald-50 dark:bg-gray-900">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-emerald-600"></div>
       </div>
     );
@@ -59,6 +61,7 @@ export default function App() {
       <Layout user={user} onLogout={handleLogout}>
         <Routes>
           <Route path="/" element={<Home />} />
+          <Route path="/donations" element={<DonationsPage user={user} />} />
           <Route 
             path="/auth" 
             element={user ? <Navigate to="/dashboard" /> : <AuthPage />} 
@@ -66,6 +69,10 @@ export default function App() {
           <Route 
             path="/dashboard" 
             element={user ? <Dashboard user={user} /> : <Navigate to="/auth" />} 
+          />
+          <Route 
+            path="/admin" 
+            element={user && user.role === 'admin' ? <AdminDashboard /> : <Navigate to="/dashboard" />} 
           />
         </Routes>
       </Layout>

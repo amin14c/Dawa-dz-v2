@@ -10,7 +10,7 @@ interface LayoutProps {
 
 export function Layout({ children, user, onLogout }: LayoutProps) {
   return (
-    <div className="min-h-screen bg-[#f8fafc] font-sans" dir="rtl">
+    <div className="min-h-screen bg-[#f8fafc] dark:bg-gray-950 font-sans transition-colors duration-200" dir="rtl">
       <Navbar user={user} onLogout={onLogout} />
       <main className="pt-20 pb-12 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
         {children}

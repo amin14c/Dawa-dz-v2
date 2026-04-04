@@ -11,7 +11,7 @@ service cloud.firestore {
     //   - uid: string (required)
     //   - name: string (required, size 2-100)
     //   - phone: string (required, size 10-15)
-    //   - role: string (required, enum: ['patient', 'pharmacist'])
+    //   - role: string (required, enum: ['patient', 'pharmacist', 'admin'])
     //   - location: string (required, size 2-100)
     //   - pharmacyName: string (optional, size 2-100)
     //   - createdAt: number (required)
@@ -43,6 +43,21 @@ service cloud.firestore {
     //   - available: bool (required)
     //   - createdAt: number (required)
     //
+    // Collection: medication_donations
+    // Document ID: {donationId}
+    // Fields:
+    //   - id: string (required)
+    //   - donorUid: string (required)
+    //   - donorName: string (required)
+    //   - donorType: string (required, enum: ['individual', 'charity'])
+    //   - medicationName: string (required, size 2-200)
+    //   - quantity: string (required, size 1-100)
+    //   - expiryDate: string (required)
+    //   - location: string (required)
+    //   - contactPhone: string (required)
+    //   - status: string (required, enum: ['available', 'claimed'])
+    //   - createdAt: number (required)
+    //
     // ===============================================================
 
     // ===============================================================
@@ -51,6 +66,12 @@ service cloud.firestore {
     
     function isAuthenticated() {
       return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() &&
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+         request.auth.token.email == "amin14c@gmail.com");
     }
 
     function isOwner(userId) {
@@ -73,7 +94,7 @@ service cloud.firestore {
       return data.uid is string && data.uid.size() > 0 &&
              data.name is string && data.name.size() >= 2 && data.name.size() <= 100 &&
              data.phone is string && data.phone.size() >= 10 && data.phone.size() <= 15 &&
-             data.role in ['patient', 'pharmacist'] &&
+             data.role in ['patient', 'pharmacist', 'admin'] &&
              data.location is string && data.location.size() >= 2 && data.location.size() <= 100 &&
              data.email is string && data.email.size() >= 5 &&
              (!('pharmacyName' in data) || (data.pharmacyName is string && data.pharmacyName.size() <= 100)) &&
@@ -87,12 +108,25 @@ service cloud.firestore {
              data.boxes is number && data.boxes > 0 &&
              data.deliveryMethod in ['pickup', 'delivery'] &&
              data.status in ['pending', 'found', 'completed'] &&
+             (!('prescriptionUrl' in data) || data.prescriptionUrl is string) &&
              data.createdAt is number;
     }
 
     function isValidOffer(data) {
       return data.message is string && data.message.size() >= 2 && data.message.size() <= 500 &&
              data.available is bool &&
+             data.createdAt is number;
+    }
+
+    function isValidDonation(data) {
+      return data.donorType in ['individual', 'charity'] &&
+             data.medicationName is string && data.medicationName.size() >= 2 && data.medicationName.size() <= 200 &&
+             data.quantity is string && data.quantity.size() >= 1 && data.quantity.size() <= 100 &&
+             data.expiryDate is string && data.expiryDate.size() >= 4 &&
+             data.location is string && data.location.size() >= 2 &&
+             data.contactPhone is string && data.contactPhone.size() >= 8 &&
+             data.status in ['available', 'claimed'] &&
+             (!('imageUrl' in data) || data.imageUrl is string) &&
              data.createdAt is number;
     }
 
@@ -103,7 +137,7 @@ service cloud.firestore {
     match /users/{userId} {
       allow read: if isAuthenticated();
       allow create: if isOwner(userId) && isValidUser(request.resource.data) && hasRequiredFields(['uid', 'name', 'phone', 'role', 'location', 'email', 'createdAt']);
-      allow update: if isOwner(userId) && isValidUser(request.resource.data) && request.resource.data.role == resource.data.role;
+      allow update: if (isOwner(userId) && isValidUser(request.resource.data) && request.resource.data.role == resource.data.role) || isAdmin();
     }
 
     match /medication_requests/{requestId} {
@@ -112,9 +146,10 @@ service cloud.firestore {
       allow update: if isAuthenticated() && (
         (request.auth.uid == resource.data.patientUid && isValidRequest(request.resource.data)) ||
         (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'pharmacist' && 
-         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status']))
+         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status'])) ||
+        isAdmin()
       );
-      allow delete: if isAuthenticated() && request.auth.uid == resource.data.patientUid;
+      allow delete: if (isAuthenticated() && request.auth.uid == resource.data.patientUid) || isAdmin();
 
       match /offers/{offerId} {
         allow read: if isAuthenticated();
@@ -122,7 +157,37 @@ service cloud.firestore {
                       get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'pharmacist' &&
                       request.auth.uid == request.resource.data.pharmacistUid &&
                       isValidOffer(request.resource.data);
+        allow delete: if isAdmin();
       }
+    }
+
+    match /medication_donations/{donationId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && request.auth.uid == request.resource.data.donorUid && isValidDonation(request.resource.data);
+      allow update: if isAuthenticated() && (
+        (request.auth.uid == resource.data.donorUid && isValidDonation(request.resource.data)) ||
+        isAdmin()
+      );
+      allow delete: if (isAuthenticated() && request.auth.uid == resource.data.donorUid) || isAdmin();
+    }
+
+    match /platform_settings/{docId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /complaints/{complaintId} {
+      allow read: if isAdmin() || (isAuthenticated() && resource.data.userId == request.auth.uid);
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    match /notifications/{notificationId} {
+      allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated() && resource.data.userId == request.auth.uid && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read']);
+      allow delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
     }
   }
 }

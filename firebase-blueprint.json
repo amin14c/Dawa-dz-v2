@@ -8,7 +8,7 @@
         "uid": { "type": "string", "description": "The unique ID of the user." },
         "name": { "type": "string", "description": "The full name of the user." },
         "phone": { "type": "string", "description": "The phone number of the user." },
-        "role": { "type": "string", "enum": ["patient", "pharmacist"], "description": "The role of the user." },
+        "role": { "type": "string", "enum": ["patient", "pharmacist", "admin"], "description": "The role of the user." },
         "location": { "type": "string", "description": "The location/wilaya of the user." },
         "email": { "type": "string", "description": "The email address of the user." },
         "pharmacyName": { "type": "string", "description": "The name of the pharmacy (only for pharmacists)." },
@@ -31,6 +31,7 @@
         "deliveryMethod": { "type": "string", "enum": ["pickup", "delivery"], "description": "The preferred delivery method." },
         "status": { "type": "string", "enum": ["pending", "found", "completed"], "description": "The status of the request." },
         "location": { "type": "string", "description": "The location where the medication is needed." },
+        "prescriptionUrl": { "type": "string", "description": "URL of the uploaded prescription image." },
         "createdAt": { "type": "number", "description": "The timestamp when the request was created." }
       },
       "required": ["id", "patientUid", "patientName", "medicationName", "medicalInfo", "dosage", "boxes", "deliveryMethod", "status", "location", "createdAt"]
@@ -50,6 +51,26 @@
         "createdAt": { "type": "number", "description": "The timestamp when the offer was created." }
       },
       "required": ["id", "requestId", "pharmacistUid", "pharmacyName", "phone", "message", "available", "createdAt"]
+    },
+    "MedicationDonation": {
+      "title": "Medication Donation",
+      "description": "A donation of medication by an individual or charity.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "The unique ID of the donation." },
+        "donorUid": { "type": "string", "description": "The UID of the donor." },
+        "donorName": { "type": "string", "description": "The name of the donor." },
+        "donorType": { "type": "string", "enum": ["individual", "charity"], "description": "The type of the donor." },
+        "medicationName": { "type": "string", "description": "The name of the donated medication." },
+        "quantity": { "type": "string", "description": "The quantity of the medication." },
+        "expiryDate": { "type": "string", "description": "The expiry date of the medication." },
+        "location": { "type": "string", "description": "The location of the donation." },
+        "contactPhone": { "type": "string", "description": "The contact phone number of the donor." },
+        "status": { "type": "string", "enum": ["available", "claimed"], "description": "The status of the donation." },
+        "imageUrl": { "type": "string", "description": "URL of the uploaded medication image." },
+        "createdAt": { "type": "number", "description": "The timestamp when the donation was created." }
+      },
+      "required": ["id", "donorUid", "donorName", "donorType", "medicationName", "quantity", "expiryDate", "location", "contactPhone", "status", "createdAt"]
     }
   },
   "firestore": {
@@ -64,6 +85,10 @@
     "/medication_requests/{requestId}/offers/{offerId}": {
       "schema": "PharmacyOffer",
       "description": "Offers for a specific medication request."
+    },
+    "/medication_donations/{donationId}": {
+      "schema": "MedicationDonation",
+      "description": "Medication donations stored by donation ID."
     }
   }
 }
