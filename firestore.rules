@@ -93,7 +93,7 @@ service cloud.firestore {
     function isValidUser(data) {
       return data.uid is string && data.uid.size() > 0 &&
              data.name is string && data.name.size() >= 2 && data.name.size() <= 100 &&
-             data.phone is string && data.phone.size() >= 10 && data.phone.size() <= 15 &&
+             data.phone is string && data.phone.size() >= 4 && data.phone.size() <= 20 &&
              data.role in ['patient', 'pharmacist', 'admin', 'donor'] &&
              data.location is string && data.location.size() >= 2 && data.location.size() <= 100 &&
              data.email is string && data.email.size() >= 5 &&
@@ -120,13 +120,15 @@ service cloud.firestore {
 
     function isValidDonation(data) {
       return data.donorType in ['individual', 'charity'] &&
+             data.donorUid is string &&
+             data.donorName is string &&
              data.medicationName is string && data.medicationName.size() >= 2 && data.medicationName.size() <= 200 &&
              data.quantity is string && data.quantity.size() >= 1 && data.quantity.size() <= 100 &&
              data.expiryDate is string && data.expiryDate.size() >= 4 &&
              data.location is string && data.location.size() >= 2 &&
-             data.contactPhone is string && data.contactPhone.size() >= 8 &&
+             data.contactPhone is string && data.contactPhone.size() >= 4 &&
              data.status in ['available', 'claimed'] &&
-             (!('imageUrl' in data) || data.imageUrl is string) &&
+             (!('imageUrl' in data) || data.imageUrl == null || data.imageUrl is string) &&
              data.createdAt is number;
     }
 
@@ -162,10 +164,11 @@ service cloud.firestore {
     }
 
     match /medication_donations/{donationId} {
-      allow read: if isAuthenticated();
+      allow read: if true;
       allow create: if isAuthenticated() && request.auth.uid == request.resource.data.donorUid && isValidDonation(request.resource.data);
       allow update: if isAuthenticated() && (
         (request.auth.uid == resource.data.donorUid && isValidDonation(request.resource.data)) ||
+        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status']) && request.resource.data.status == 'claimed') ||
         isAdmin()
       );
       allow delete: if (isAuthenticated() && request.auth.uid == resource.data.donorUid) || isAdmin();
