@@ -4,6 +4,8 @@ import { db } from '../firebase';
 import { MedicationDonation, UserProfile } from '../types';
 import { HeartHandshake, MapPin, Calendar, Phone, Search, Plus, CheckCircle2 } from 'lucide-react';
 import { DonationModal } from '../components/DonationModal';
+import { useNavigate } from 'react-router-dom';
+import toast from 'react-hot-toast';
 
 interface DonationsPageProps {
   user: UserProfile | null;
@@ -14,6 +16,7 @@ export function DonationsPage({ user }: DonationsPageProps) {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const navigate = useNavigate();
 
   useEffect(() => {
     const q = query(
@@ -40,7 +43,8 @@ export function DonationsPage({ user }: DonationsPageProps) {
 
   const handleClaim = async (donationId: string) => {
     if (!user) {
-      alert('يجب تسجيل الدخول أولاً');
+      toast.error('يجب تسجيل الدخول أولاً لحجز التبرع');
+      navigate('/auth');
       return;
     }
     if (window.confirm('هل أنت متأكد أنك تريد حجز هذا التبرع؟ يرجى التواصل مع المتبرع بعد الحجز.')) {
@@ -48,12 +52,21 @@ export function DonationsPage({ user }: DonationsPageProps) {
         await updateDoc(doc(db, 'medication_donations', donationId), {
           status: 'claimed'
         });
-        alert('تم حجز التبرع بنجاح. يرجى التواصل مع المتبرع في أقرب وقت.');
+        toast.success('تم حجز التبرع بنجاح. يرجى التواصل مع المتبرع في أقرب وقت.');
       } catch (error) {
         console.error('Error claiming donation:', error);
-        alert('حدث خطأ أثناء حجز التبرع.');
+        toast.error('حدث خطأ أثناء حجز التبرع.');
       }
     }
+  };
+
+  const handleAddDonationClick = () => {
+    if (!user) {
+      toast.error('يجب تسجيل الدخول أولاً لإضافة تبرع');
+      navigate('/auth');
+      return;
+    }
+    setIsModalOpen(true);
   };
 
   return (
@@ -69,15 +82,13 @@ export function DonationsPage({ user }: DonationsPageProps) {
           </p>
         </div>
         
-        {user && (
-          <button
-            onClick={() => setIsModalOpen(true)}
-            className="bg-emerald-600 text-white px-6 py-3 rounded-xl font-medium hover:bg-emerald-700 transition-colors flex items-center gap-2 shadow-lg shadow-emerald-200 dark:shadow-none"
-          >
-            <Plus className="w-5 h-5" />
-            إضافة تبرع
-          </button>
-        )}
+        <button
+          onClick={handleAddDonationClick}
+          className="bg-emerald-600 text-white px-6 py-3 rounded-xl font-medium hover:bg-emerald-700 transition-colors flex items-center gap-2 shadow-lg shadow-emerald-200 dark:shadow-none"
+        >
+          <Plus className="w-5 h-5" />
+          إضافة تبرع
+        </button>
       </div>
 
       <div className="bg-white dark:bg-gray-800 p-4 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 mb-8">

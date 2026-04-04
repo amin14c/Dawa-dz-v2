@@ -21,7 +21,12 @@ export default function App() {
         try {
           const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
           if (userDoc.exists()) {
-            setUser({ ...userDoc.data(), uid: firebaseUser.uid });
+            const userData = userDoc.data();
+            // Automatically grant admin role to the specified email
+            if (firebaseUser.email === 'amin14c@gmail.com') {
+              userData.role = 'admin';
+            }
+            setUser({ ...userData, uid: firebaseUser.uid });
           } else {
             setUser(null);
           }

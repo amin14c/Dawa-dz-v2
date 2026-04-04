@@ -81,7 +81,7 @@ export function AuthPage() {
           name: formData.name,
           phone: formData.phone,
           location: formData.location,
-          role,
+          role: formData.email === 'amin14c@gmail.com' ? 'admin' : role,
           email: formData.email,
           createdAt: Date.now(),
           ...(role === 'pharmacist' && { pharmacyName: formData.pharmacyName })
